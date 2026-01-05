@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EDW Nexus - Data Engineer's Command Center</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0e17;--bg-card:rgba(17,24,39,0.9);--bg-input:#1f2937;--border:rgba(75,85,99,0.5);--text:#f9fafb;--text-sec:#9ca3af;--text-muted:#6b7280;--accent:#6366f1;--accent2:#8b5cf6;--success:#10b981;--warning:#f59e0b;--error:#ef4444;--sidebar:240px;--header:56px}
+    body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideIn{from{opacity:0;transform:translateX(-15px)}to{opacity:1;transform:translateX(0)}}
+    @keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
+    @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+    @keyframes confettifall{0%{transform:translateY(-100vh) rotate(0deg)}100%{transform:translateY(100vh) rotate(720deg)}}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+    @keyframes statusPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:0.6}}
+    .fade-in{animation:fadeIn 0.35s ease-out forwards}
+    .slide-in{animation:slideIn 0.3s ease-out forwards}
+    .scale-in{animation:scaleIn 0.3s ease-out forwards}
+    .float{animation:float 3s ease-in-out infinite}
+    .skeleton{background:linear-gradient(90deg,var(--bg-input) 25%,var(--border) 50%,var(--bg-input) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px}
+    .toggle-switch{position:relative;width:36px;height:20px;background:var(--bg-input);border-radius:10px;cursor:pointer;transition:0.3s}
+    .toggle-switch.active{background:var(--accent)}
+    .toggle-switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:0.3s}
+    .toggle-switch.active::after{left:18px}
+    .status-pulse{position:relative}
+    .status-pulse::after{content:'';position:absolute;inset:-3px;border-radius:50%;background:inherit;animation:statusPulse 2s infinite;opacity:0.5}
+    .tooltip-wrap{position:relative}
+    .tooltip-wrap:hover .tooltip{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
+    .tooltip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%) translateY(5px);padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;font-size:11px;white-space:nowrap;opacity:0;visibility:hidden;transition:0.2s;z-index:1000;pointer-events:none}
+    .btn-glow:hover{box-shadow:0 0 20px rgba(99,102,241,0.4);transform:translateY(-2px)}
+    .card-lift{transition:all 0.25s ease}
+    .card-lift:hover{transform:translateY(-3px);box-shadow:0 8px 25px rgba(0,0,0,0.3);border-color:var(--accent)}
+    .progress-bar{height:4px;background:var(--bg-input);border-radius:2px;overflow:hidden}
+    .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 0.4s ease}
+    .severity-critical{background:rgba(239,68,68,0.15);border-left:3px solid var(--error);color:var(--error)}
+    .severity-high{background:rgba(239,68,68,0.1);border-left:3px solid var(--error)}
+    .severity-medium{background:rgba(245,158,11,0.1);border-left:3px solid var(--warning)}
+    .severity-low{background:rgba(16,185,129,0.1);border-left:3px solid var(--success)}
+    .severity-info{background:rgba(99,102,241,0.1);border-left:3px solid var(--accent)}
+    .confetti-piece{position:fixed;width:10px;height:10px;top:-10px;z-index:9999;animation:confettifall 3s linear forwards}
+    .tab-radio{display:none}
+    .tab-label{padding:8px 16px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px 8px 0 0;cursor:pointer;font-size:12px;color:var(--text-sec);transition:0.2s}
+    .tab-radio:checked + .tab-label{background:var(--accent);color:#fff;border-color:var(--accent)}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+// Constants
+const LLMS = [
+  { id: 'claude-4', name: 'Claude 4 Sonnet', icon: '🟣' },
+  { id: 'claude-3', name: 'Claude 3.5', icon: '🟣' },
+  { id: 'llama', name: 'Llama 3.3 70B', icon: '🦙' },
+  { id: 'arctic', name: 'Snowflake Arctic', icon: '❄️' }
+];
+
+const ENVS = [
+  { id: 'DEV', color: '#10b981', icon: '🔧' },
+  { id: 'QA', color: '#f59e0b', icon: '🧪' },
+  { id: 'PROD', color: '#ef4444', icon: '🚀', auth: true }
+];
+
+const SOURCES = [
+  { id: 'SAP', icon: '🏭', color: '#0FAAFF', tables: ['BSEG', 'KNA1', 'MARA', 'EKKO', 'DD03M'] },
+  { id: 'SALESFORCE', icon: '☁️', color: '#00A1E0', tables: ['Account', 'Contact', 'Opportunity'] },
+  { id: 'ACCOLADE', icon: '📊', color: '#6B5B95', tables: ['Projects', 'Milestones'] },
+  { id: 'IVALUA', icon: '🛒', color: '#FF6B35', tables: ['Suppliers', 'Contracts'] },
+  { id: 'ORACLE', icon: '🗄️', color: '#F80000', tables: ['Orders', 'Customers'] }
+];
+
+const TABS = [
+  { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+  { id: 'code', label: 'Code Studio', icon: '⚡' },
+  { id: 'format', label: 'SQL Formatter', icon: '✨' },
+  { id: 'docs', label: 'Documentation', icon: '📝' },
+  { id: 'tests', label: 'Test Generator', icon: '🧪' },
+  { id: 'github', label: 'GitHub', icon: '🔗' },
+  { id: 'jobs', label: 'Job Monitor', icon: '🔔' },
+  { id: 'kb', label: 'Knowledge Base', icon: '🧠' },
+  { id: 'lineage', label: 'Data Lineage', icon: '🔀' },
+  { id: 'snippets', label: 'Snippets', icon: '📦' },
+  { id: 'settings', label: 'Settings', icon: '⚙️' }
+];
+
+const BRANCHES = [
+  { id: 'main', name: 'main', protected: true },
+  { id: 'develop', name: 'develop' },
+  { id: 'feature/etl-optimization', name: 'feature/etl-optimization' }
+];
+
+const DQ_TABLES = [
+  { name: 'STG_ORDERS', freshness: 98, completeness: 95, accuracy: 99, rows: 1245678, updated: '2m ago', trend: [95, 96, 97, 98, 95, 98], alerts: [] },
+  { name: 'STG_CUSTOMERS', freshness: 85, completeness: 88, accuracy: 92, rows: 45230, updated: '15m ago', trend: [90, 88, 85, 82, 85, 85], alerts: [{ type: 'warning', msg: 'Completeness dropped 5%' }] },
+  { name: 'INT_ENRICHED', freshness: 72, completeness: 78, accuracy: 85, rows: 892341, updated: '1h ago', trend: [88, 85, 80, 75, 72, 72], alerts: [{ type: 'error', msg: 'Row count dropped 15%' }] },
+  { name: 'DWH_SALES', freshness: 95, completeness: 99, accuracy: 98, rows: 5678234, updated: '5m ago', trend: [97, 98, 96, 95, 95, 95], alerts: [] },
+  { name: 'RPT_SUMMARY', freshness: 45, completeness: 60, accuracy: 70, rows: 12456, updated: '3h ago', trend: [80, 70, 65, 55, 50, 45], alerts: [{ type: 'critical', msg: 'Data stale - refresh failed' }] }
+];
+
+// Helpers
+const formatSQL = (sql, style) => {
+  if (!sql) return '';
+  let f = sql.trim().replace(/\s+/g, ' ');
+  const kw = ['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'JOIN', 'LEFT JOIN', 'GROUP BY', 'ORDER BY', 'HAVING', 'WITH', 'LIMIT'];
+  kw.forEach(k => { f = f.replace(new RegExp('\\b' + k + '\\b', 'gi'), k); });
+  if (style === 'compact') return f;
+  ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT'].forEach(c => {
+    f = f.replace(new RegExp('\\b' + c + '\\b', 'gi'), '\n' + c);
+  });
+  f = f.replace(/\bJOIN\b/gi, '\nJOIN');
+  f = f.replace(/\bLEFT JOIN\b/gi, '\nLEFT JOIN');
+  if (style === 'expanded') {
+    f = f.replace(/SELECT\s+/gi, 'SELECT\n    ');
+    f = f.replace(/,\s*(?=[A-Za-z])/g, ',\n    ');
+  }
+  f = f.replace(/\bAND\b/gi, '\n   AND');
+  return f.trim();
+};
+
+const addComments = (sql) => {
+  if (!sql) return '';
+  let c = sql;
+  c = c.replace(/SELECT/gi, '-- Select columns\nSELECT');
+  c = c.replace(/\nFROM/gi, '\n-- Source table(s)\nFROM');
+  c = c.replace(/\nWHERE/gi, '\n-- Filter conditions\nWHERE');
+  c = c.replace(/\nJOIN/gi, '\n-- Join table\nJOIN');
+  c = c.replace(/\nGROUP BY/gi, '\n-- Grouping\nGROUP BY');
+  return c;
+};
+
+// Components
+const Skeleton = ({ w, h, style }) => (
+  <div className="skeleton" style={{ width: w || '100%', height: h || '20px', ...style }} />
+);
+
+const Progress = ({ value, label }) => (
+  <div style={{ marginBottom: '10px' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+      <span style={{ fontSize: '11px', color: 'var(--text-sec)' }}>{label}</span>
+      <span style={{ fontSize: '11px', color: 'var(--accent)' }}>{value}%</span>
+    </div>
+    <div className="progress-bar">
+      <div className="progress-fill" style={{ width: value + '%' }} />
+    </div>
+  </div>
+);
+
+const Tip = ({ children, text }) => (
+  <div className="tooltip-wrap">
+    {children}
+    <div className="tooltip">{text}</div>
+  </div>
+);
+
+const MiniChart = ({ data, color, h }) => {
+  const height = h || 30;
+  const chartColor = color || 'var(--accent)';
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * 100;
+    const y = height - ((v - min) / range) * height;
+    return x + ',' + y;
+  }).join(' ');
+  
+  return (
+    <svg width="100%" height={height} style={{ overflow: 'visible' }}>
+      <polyline points={pts} fill="none" stroke={chartColor} strokeWidth="2" strokeLinecap="round" />
+      {data.map((v, i) => {
+        const x = (i / (data.length - 1)) * 100;
+        const y = height - ((v - min) / range) * height;
+        return <circle key={i} cx={x + '%'} cy={y} r="3" fill={chartColor} opacity={i === data.length - 1 ? 1 : 0.4} />;
+      })}
+    </svg>
+  );
+};
+
+const DQScore = ({ score, size }) => {
+  const sz = size || 50;
+  const c = score >= 90 ? 'var(--success)' : score >= 70 ? 'var(--warning)' : 'var(--error)';
+  const circ = 2 * Math.PI * (sz / 2 - 4);
+  const off = circ - (score / 100) * circ;
+  
+  return (
+    <div style={{ position: 'relative', width: sz, height: sz }}>
+      <svg width={sz} height={sz} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={sz / 2} cy={sz / 2} r={sz / 2 - 4} fill="none" stroke="var(--bg-input)" strokeWidth="4" />
+        <circle cx={sz / 2} cy={sz / 2} r={sz / 2 - 4} fill="none" stroke={c} strokeWidth="4" strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round" style={{ transition: '0.5s' }} />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: sz / 3, fontWeight: 700, color: c }}>{score}</span>
+      </div>
+    </div>
+  );
+};
+
+const Confetti = ({ show, onDone }) => {
+  const [pieces, setPieces] = useState([]);
+  const colors = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
+  
+  useEffect(() => {
+    if (show) {
+      const p = Array.from({ length: 40 }, (_, i) => ({
+        id: i,
+        left: Math.random() * 100,
+        delay: Math.random() * 0.5,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: 6 + Math.random() * 6
+      }));
+      setPieces(p);
+      setTimeout(() => {
+        setPieces([]);
+        if (onDone) onDone();
+      }, 3000);
+    }
+  }, [show]);
+  
+  return (
+    <>
+      {pieces.map(p => (
+        <div
+          key={p.id}
+          className="confetti-piece"
+          style={{
+            left: p.left + '%',
+            animationDelay: p.delay + 's',
+            background: p.color,
+            width: p.size,
+            height: p.size,
+            borderRadius: Math.random() > 0.5 ? '50%' : '2px'
+          }}
+        />
+      ))}
+    </>
+  );
+};
+
+// Main App
+const App = () => {
+  const [tab, setTab] = useState('dashboard');
+  const [collapsed, setCollapsed] = useState(false);
+  const [env, setEnv] = useState('DEV');
+  const [llm, setLlm] = useState('claude-4');
+  const [loading, setLoading] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const [auth, setAuth] = useState({ DEV: true, QA: true, PROD: false, github: false });
+  const [modal, setModal] = useState(null);
+  const [confetti, setConfetti] = useState(false);
+  const [progress, setProgress] = useState(null);
+  const [vscode, setVscode] = useState(false);
+
+  // Code Studio
+  const [codeIn, setCodeIn] = useState('');
+  const [analysis, setAnalysis] = useState(null);
+  const [codeOut, setCodeOut] = useState('');
+  const [autoComment, setAutoComment] = useState(false);
+
+  // SQL Formatter
+  const [sqlIn, setSqlIn] = useState('');
+  const [sqlOut, setSqlOut] = useState('');
+  const [fmtStyle, setFmtStyle] = useState('standard');
+  const [fmtComment, setFmtComment] = useState(false);
+
+  // Documentation
+  const [docIn, setDocIn] = useState('');
+  const [docOut, setDocOut] = useState('');
+  const [docType, setDocType] = useState('technical');
+
+  // Tests
+  const [testIn, setTestIn] = useState('');
+  const [testOut, setTestOut] = useState('');
+  const [testFw, setTestFw] = useState('snowflake');
+
+  // GitHub
+  const [prTitle, setPrTitle] = useState('');
+  const [prBranch, setPrBranch] = useState('develop');
+  const [namingCheck, setNamingCheck] = useState(true);
+  const [namingRes, setNamingRes] = useState(null);
+  const [prs, setPrs] = useState([
+    { id: 1, title: 'feat: Optimize query', status: 'merged', date: '2d', branch: 'main' },
+    { id: 2, title: 'fix: Pipeline timeout', status: 'open', date: '5h', branch: 'develop' }
+  ]);
+
+  // Jobs
+  const [jobs, setJobs] = useState([
+    { id: 1, name: 'Daily_Sales_ETL', status: 'RUNNING', wh: 'ETL_WH', lastRun: '2024-01-15 08:00', prog: 67, critical: true, avgTime: 45 },
+    { id: 2, name: 'Hourly_Inventory', status: 'SUCCESS', wh: 'SYNC_WH', lastRun: '2024-01-15 09:00', avgTime: 12 },
+    { id: 3, name: 'Customer_Pipeline', status: 'FAILED', wh: 'PIPE_WH', error: 'Connection timeout', lastRun: '2024-01-15 07:30', fix: 'Increase warehouse size', critical: true, avgTime: 30 },
+    { id: 4, name: 'Monthly_Report', status: 'SCHEDULED', wh: 'RPT_WH', nextRun: '2024-01-16 00:00', critical: true, avgTime: 120 },
+    { id: 5, name: 'Data_Quality_Check', status: 'FAILED', wh: 'QA_WH', error: 'Null values detected', lastRun: '2024-01-15 06:00', fix: 'Add COALESCE', avgTime: 15 },
+    { id: 6, name: 'Finance_Reconciliation', status: 'RUNNING', wh: 'FIN_WH', lastRun: '2024-01-15 10:00', prog: 85, critical: true, avgTime: 25 }
+  ]);
+  const [selJob, setSelJob] = useState(null);
+
+  // KB
+  const [kbQ, setKbQ] = useState('');
+  const [kbRes, setKbRes] = useState([]);
+  const [kbChat, setKbChat] = useState([]);
+
+  // Lineage
+  const [lineQ, setLineQ] = useState('');
+  const [lineData, setLineData] = useState(null);
+
+  // Snippets
+  const snippets = [
+    { id: 1, name: 'Incremental Load', code: 'MERGE INTO t USING s ON t.id=s.id\nWHEN MATCHED THEN UPDATE\nWHEN NOT MATCHED THEN INSERT;', cat: 'ETL' },
+    { id: 2, name: 'Window Function', code: 'SELECT ROW_NUMBER() OVER(PARTITION BY g ORDER BY d),\nLAG(v) OVER(PARTITION BY g ORDER BY d)\nFROM t;', cat: 'Analytics' },
+    { id: 3, name: 'JSON Flatten', code: 'SELECT f.value:field::STRING\nFROM t, LATERAL FLATTEN(json_col) f;', cat: 'Transform' }
+  ];
+
+  // Query Performance
+  const [perfInput, setPerfInput] = useState('');
+  const [perfInputType, setPerfInputType] = useState('sql');
+  const [perfResult, setPerfResult] = useState(null);
+  const [perfLoading, setPerfLoading] = useState(false);
+
+  const toast = (msg, type) => {
+    const t = type || 'success';
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, msg, type: t }]);
+    setTimeout(() => setToasts(prev => prev.filter(x => x.id !== id)), 3000);
+  };
+
+  const runProgress = async (label, fn) => {
+    setProgress({ label, val: 0 });
+    for (let i = 0; i <= 100; i += 15) {
+      await new Promise(r => setTimeout(r, 100));
+      setProgress({ label, val: Math.min(i, 100) });
+    }
+    await fn();
+    setProgress(null);
+  };
+
+  const analyzePerf = async () => {
+    if (!perfInput.trim()) return;
+    setPerfLoading(true);
+    await runProgress('Analyzing ' + (perfInputType === 'sql' ? 'query' : 'Query ID') + '...', async () => {
+      let query = perfInput;
+      if (perfInputType === 'queryid') {
+        // Simulate fetching query from Query ID
+        query = 'SELECT * FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.date > CURRENT_DATE - 30';
+      }
+      
+      const joins = (query.match(/JOIN/gi) || []).length;
+      const hasStar = /SELECT\s+\*/i.test(query);
+      const hasSub = /\(\s*SELECT/i.test(query);
+      const time = 100 + joins * 500 + (hasStar ? 300 : 0) + (hasSub ? 800 : 0);
+      const cost = 0.001 + joins * 0.002 + (hasStar ? 0.005 : 0);
+      
+      const opts = [];
+      if (hasStar) opts.push({ sev: 'high', issue: 'SELECT * scans all columns', fix: 'Specify only needed columns', impact: '-30% scan' });
+      if (joins > 2) opts.push({ sev: 'medium', issue: joins + ' JOINs detected', fix: 'Use CTEs or temp tables', impact: '-40% memory' });
+      if (hasSub) opts.push({ sev: 'medium', issue: 'Subquery in WHERE clause', fix: 'Rewrite as JOIN', impact: '-25% time' });
+      if (!hasStar && joins <= 2 && !hasSub) opts.push({ sev: 'low', issue: 'Query looks optimized', fix: 'Consider adding clustering keys', impact: '+10% speed' });
+      
+      const plan = [{ op: 'TableScan', table: 'source', cost: 35, rows: '1.2M' }];
+      if (joins > 0) plan.push({ op: 'HashJoin', table: 'lookup', cost: 45, rows: '890K' });
+      plan.push({ op: 'Aggregate', table: '-', cost: 15, rows: '12K' });
+      plan.push({ op: 'Sort', table: '-', cost: 5, rows: '12K' });
+      
+      setPerfResult({
+        time: (time / 1000).toFixed(2) + 's',
+        cost: '$' + cost.toFixed(4),
+        bytes: (Math.random() * 500 + 50).toFixed(1) + ' MB',
+        partitionsPruned: Math.floor(Math.random() * 80) + 20 + '%',
+        complexity: joins > 3 ? 'High' : joins > 1 ? 'Medium' : 'Low',
+        opts,
+        plan,
+        queryId: perfInputType === 'queryid' ? perfInput : '01b4d5e1-' + Math.random().toString(36).substr(2, 8)
+      });
+    });
+    setPerfLoading(false);
+    toast('Performance analysis complete!');
+  };
+
+  const analyze = async () => {
+    if (!codeIn.trim()) return;
+    setLoading(true);
+    await runProgress('Analyzing code...', async () => {
+      const joins = (codeIn.match(/JOIN/gi) || []).length;
+      const score = Math.max(0, 100 - joins * 15);
+      const issues = [];
+      if (/SELECT\s+\*/i.test(codeIn)) issues.push({ sev: 'HIGH', msg: 'SELECT * detected', fix: 'Specify columns explicitly' });
+      if (joins > 2) issues.push({ sev: 'MEDIUM', msg: joins + ' JOINs found', fix: 'Consider using CTEs' });
+      if (/WHERE.*OR/i.test(codeIn)) issues.push({ sev: 'LOW', msg: 'OR in WHERE clause', fix: 'Consider UNION for better performance' });
+      
+      setAnalysis({
+        score,
+        level: score > 70 ? 'Simple' : score > 40 ? 'Moderate' : 'Complex',
+        joins,
+        issues,
+        suggestions: ['Add clustering keys on frequently filtered columns', 'Enable Query Acceleration Service', 'Consider materialized views for repeated queries', 'Use result caching for static data']
+      });
+      
+      let opt = formatSQL(codeIn, 'expanded');
+      if (autoComment) opt = addComments(opt);
+      const model = LLMS.find(m => m.id === llm);
+      setCodeOut('-- Optimized by EDW Nexus\n-- Model: ' + (model ? model.name : llm) + '\n-- Environment: ' + env + '\n-- Timestamp: ' + new Date().toISOString() + '\n\n' + opt);
+    });
+    setLoading(false);
+    toast('Analysis complete!');
+  };
+
+  const genDocs = async () => {
+    if (!docIn.trim()) return;
+    setLoading(true);
+    await runProgress('Generating docs...', async () => {
+      const model = LLMS.find(m => m.id === llm);
+      let doc = '';
+      if (docType === 'technical') {
+        doc = '# Technical Documentation\n\n> Generated by: EDW Nexus\n> Model: ' + (model ? model.name : llm) + '\n> Date: ' + new Date().toISOString() + '\n\n## Overview\nData transformation module.\n\n## Code\n```sql\n' + docIn + '\n```';
+      } else if (docType === 'business') {
+        doc = '# Business Documentation\n\n## Purpose\nCalculates key metrics.';
+      } else {
+        doc = '-- Module: Transform\n-- Date: ' + new Date().toISOString() + '\n\n' + docIn;
+      }
+      setDocOut(doc);
+    });
+    setLoading(false);
+    toast('Docs generated!');
+  };
+
+  const genTests = async () => {
+    if (!testIn.trim()) return;
+    setLoading(true);
+    await runProgress('Generating tests...', async () => {
+      let tests = '';
+      if (testFw === 'snowflake') {
+        tests = "-- TEST SUITE\n\nSELECT 'DATA_EXISTS', CASE WHEN COUNT(*)>0 THEN 'PASS' ELSE 'FAIL' END\nFROM (" + testIn.replace(/;$/, '') + ") t;";
+      } else if (testFw === 'dbt') {
+        tests = 'version: 2\nmodels:\n  - name: model\n    columns:\n      - name: id\n        tests: [unique, not_null]';
+      } else {
+        tests = 'validator.expect_table_row_count_to_be_between(1, 1000000)';
+      }
+      setTestOut(tests);
+    });
+    setLoading(false);
+    toast('Tests generated!');
+  };
+
+  const runNaming = async () => {
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 800));
+    setNamingRes({
+      passed: 3,
+      failed: 1,
+      warnings: 1,
+      details: [
+        { name: 'STG_ORDERS', status: 'pass', rule: 'Tables: PREFIX_NAME' },
+        { name: 'VW_SALES', status: 'pass', rule: 'Views: VW_NAME' },
+        { name: 'SP_LOAD', status: 'pass', rule: 'Procedures: SP_NAME' },
+        { name: 'OrderDate', status: 'fail', rule: 'Columns: lowercase', sug: 'order_date' },
+        { name: 'TMP_DATA', status: 'warning', rule: 'Avoid TMP prefix' }
+      ]
+    });
+    setLoading(false);
+  };
+
+  const createPR = async () => {
+    if (!auth.github) { setModal('github'); return; }
+    if (!prTitle.trim()) { toast('Enter title', 'error'); return; }
+    if (namingCheck && !namingRes) { toast('Run naming check first', 'error'); return; }
+    if (namingCheck && namingRes && namingRes.failed > 0) { toast('Fix naming errors first', 'error'); return; }
+    
+    setLoading(true);
+    await runProgress('Creating PR...', async () => {
+      setPrs([{ id: prs.length + 1, title: prTitle, status: 'open', date: 'now', branch: prBranch }, ...prs]);
+      setPrTitle('');
+      setNamingRes(null);
+    });
+    setLoading(false);
+    setConfetti(true);
+    toast('PR created! 🎉');
+  };
+
+  const retryJob = async (job) => {
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 1000));
+    setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'RUNNING', error: null, fix: null, prog: 0 } : j));
+    setLoading(false);
+    toast('Retrying ' + job.name + '...');
+    
+    let prog = 0;
+    const interval = setInterval(() => {
+      prog += 10;
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, prog } : j));
+      if (prog >= 100) {
+        clearInterval(interval);
+        setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'SUCCESS', lastRun: new Date().toISOString().slice(0, 16).replace('T', ' '), prog: null } : j));
+        setConfetti(true);
+        toast(job.name + ' completed! 🎉');
+      }
+    }, 300);
+  };
+
+  const searchKB = async () => {
+    if (!kbQ.trim()) return;
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 800));
+    const res = [];
+    const q = kbQ.toLowerCase();
+    if (q.includes('bseg') || q.includes('accounting')) {
+      res.push({ src: 'SAP', tbl: 'BSEG', title: 'Accounting Document', desc: 'FI line items', fields: ['BUKRS', 'BELNR', 'DMBTR'], rel: 95 });
+    }
+    if (q.includes('customer') || q.includes('account')) {
+      res.push({ src: 'SAP', tbl: 'KNA1', title: 'Customer Master', desc: 'Customer data', fields: ['KUNNR', 'NAME1'], rel: 90 });
+      res.push({ src: 'SALESFORCE', tbl: 'Account', title: 'Account', desc: 'CRM accounts', fields: ['Id', 'Name'], rel: 88 });
+    }
+    if (res.length === 0) {
+      res.push({ src: 'INFO', tbl: '', title: 'No results', desc: 'Try: BSEG, customer', fields: [], rel: 0 });
+    }
+    setKbRes(res);
+    setLoading(false);
+  };
+
+  const sendKB = async (msg) => {
+    setKbChat(prev => [...prev, { role: 'user', msg }]);
+    setKbQ('');
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 1200));
+    let resp = '';
+    if (msg.toLowerCase().includes('bseg')) {
+      resp = '## SAP BSEG\n\nAccounting Document Segment.\n\n| Field | Description |\n|---|---|\n| BUKRS | Company Code |\n| BELNR | Doc Number |';
+    } else {
+      resp = 'I can help with SAP, Salesforce, Accolade, Ivalua, Oracle.\n\nTry: "What is BSEG?"';
+    }
+    setKbChat(prev => [...prev, { role: 'ai', msg: resp }]);
+    setLoading(false);
+  };
+
+  const traceLine = async () => {
+    if (!lineQ.trim()) return;
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 800));
+    setLineData({
+      target: lineQ.toUpperCase(),
+      sources: ['SALES.ORDERS', 'CRM.CUSTOMERS'],
+      transforms: ['STG_ORDERS', 'INT_ENRICHED']
+    });
+    setLoading(false);
+    toast('Lineage traced!');
+  };
+
+  const connectVS = async () => {
+    setLoading(true);
+    await runProgress('Connecting VS Code...', async () => {
+      setVscode(true);
+    });
+    setLoading(false);
+    setConfetti(true);
+    toast('VS Code connected! 🎉');
+  };
+
+  const sendToVS = (code) => {
+    if (!vscode) { toast('Connect VS Code first', 'error'); return; }
+    toast('Sent to VS Code!');
+  };
+
+  // Styles
+  const s = {
+    card: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '16px' },
+    panel: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+    panelH: { padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)' },
+    editor: { flex: 1, padding: '14px', background: 'var(--bg)', border: 'none', color: 'var(--text)', fontFamily: '"JetBrains Mono",monospace', fontSize: '12px', lineHeight: 1.6, resize: 'none', outline: 'none' },
+    btn: { padding: '8px 16px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' },
+    btn2: { padding: '6px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-sec)', cursor: 'pointer', fontSize: '12px', transition: 'all 0.2s' },
+    btnDanger: { padding: '6px 12px', background: 'rgba(239,68,68,0.2)', border: '1px solid var(--error)', borderRadius: '6px', color: 'var(--error)', cursor: 'pointer', fontSize: '12px' },
+    btnSuccess: { padding: '6px 12px', background: 'rgba(16,185,129,0.2)', border: '1px solid var(--success)', borderRadius: '6px', color: 'var(--success)', cursor: 'pointer', fontSize: '12px' },
+    input: { width: '100%', padding: '10px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px', outline: 'none', transition: '0.2s' },
+    badge: (c) => ({ padding: '3px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 600, background: c + '25', color: c })
+  };
+
+  // Dashboard - WITHOUT Data Quality Dashboard
+  const Dashboard = () => (
+    <div className="fade-in">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '14px', marginBottom: '20px' }}>
+        {[
+          { icon: '🔍', label: 'Queries Today', val: '24', c: '#6366f1' },
+          { icon: '⚙️', label: 'Jobs OK', val: jobs.filter(j => j.status === 'SUCCESS' || j.status === 'RUNNING').length + '/' + jobs.length, c: '#10b981' },
+          { icon: '📦', label: 'Snippets', val: snippets.length, c: '#8b5cf6' },
+          { icon: '🧠', label: 'Sources', val: SOURCES.length, c: '#f59e0b' }
+        ].map((st, i) => (
+          <div key={i} className="card-lift" style={{ ...s.card, display: 'flex', alignItems: 'center', gap: '12px', padding: '16px' }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'linear-gradient(135deg,' + st.c + ',' + st.c + '99)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>{st.icon}</div>
+            <div>
+              <div style={{ fontSize: '22px', fontWeight: 700 }}>{st.val}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-sec)' }}>{st.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={s.card}>
+        <h3 style={{ fontSize: '14px', marginBottom: '12px' }}>⚡ Quick Actions</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: '8px' }}>
+          {[
+            { icon: '⚡', label: 'Analyze', t: 'code' },
+            { icon: '✨', label: 'Format', t: 'format' },
+            { icon: '📝', label: 'Docs', t: 'docs' },
+            { icon: '🧪', label: 'Tests', t: 'tests' },
+            { icon: '🧠', label: 'Knowledge', t: 'kb' },
+            { icon: '🔗', label: 'GitHub', t: 'github' }
+          ].map((a, i) => (
+            <Tip key={i} text={'Go to ' + a.label}>
+              <button onClick={() => setTab(a.t)} className="card-lift" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', color: 'var(--text-sec)' }}>
+                <span style={{ fontSize: '22px' }}>{a.icon}</span>
+                <span style={{ fontSize: '11px' }}>{a.label}</span>
+              </button>
+            </Tip>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+        <div style={s.card}>
+          <h3 style={{ fontSize: '14px', marginBottom: '12px' }}>🔔 Recent Jobs</h3>
+          {jobs.slice(0, 4).map((j, i) => (
+            <div key={j.id} onClick={() => { setTab('jobs'); setSelJob(j); }} className="card-lift" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'var(--bg-input)', borderRadius: '8px', marginBottom: '6px', cursor: 'pointer' }}>
+              <span className={j.status === 'RUNNING' ? 'status-pulse' : ''} style={{ width: '8px', height: '8px', borderRadius: '50%', background: j.status === 'RUNNING' ? 'var(--warning)' : j.status === 'SUCCESS' ? 'var(--success)' : j.status === 'FAILED' ? 'var(--error)' : 'var(--accent)' }} />
+              <span style={{ flex: 1, fontSize: '12px', fontWeight: 500 }}>{j.name}</span>
+              {j.status === 'RUNNING' && j.prog && (
+                <div style={{ width: '60px' }}>
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width: j.prog + '%' }} />
+                  </div>
+                </div>
+              )}
+              <span style={s.badge(j.status === 'RUNNING' ? 'var(--warning)' : j.status === 'SUCCESS' ? 'var(--success)' : j.status === 'FAILED' ? 'var(--error)' : 'var(--accent)')}>{j.status}</span>
+            </div>
+          ))}
+        </div>
+        <div style={s.card}>
+          <h3 style={{ fontSize: '14px', marginBottom: '12px' }}>🌐 Data Sources</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            {SOURCES.slice(0, 4).map((src, i) => (
+              <Tip key={src.id} text={'Browse ' + src.id + ' tables'}>
+                <div onClick={() => setTab('kb')} className="card-lift" style={{ padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', borderLeft: '3px solid ' + src.color, cursor: 'pointer' }}>
+                  <span style={{ fontSize: '18px' }}>{src.icon}</span>
+                  <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '4px' }}>{src.id}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--accent)' }}>{src.tables.length} tables</div>
+                </div>
+              </Tip>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Code Studio - Analyze on TOP (main section), Performance Analyzer at BOTTOM
+  const CodeStudio = () => (
+    <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - var(--header) - 40px)', gap: '16px' }}>
+      {/* Main Analyze & Optimize Section - TOP */}
+      <div style={{ flex: '1 1 60%', minHeight: '400px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px 1fr', gap: '14px', height: '100%' }}>
+          <div style={s.panel}>
+            <div style={s.panelH}>
+              <span style={{ fontSize: '12px', fontWeight: 600 }}>📝 SQL Input</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {vscode && codeOut && (
+                  <Tip text="Send to VS Code">
+                    <button onClick={() => sendToVS(codeOut)} style={{ ...s.btn2, padding: '4px 8px', fontSize: '10px' }}>💻</button>
+                  </Tip>
+                )}
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-sec)', cursor: 'pointer' }}>
+                  <span>Comments</span>
+                  <div className={'toggle-switch ' + (autoComment ? 'active' : '')} onClick={() => setAutoComment(!autoComment)} />
+                </label>
+              </div>
+            </div>
+            <textarea value={codeIn} onChange={e => setCodeIn(e.target.value)} placeholder="Paste your SQL query here for optimization..." style={s.editor} />
+            <div style={{ padding: '10px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{codeIn.length} chars</span>
+              <button onClick={analyze} disabled={!codeIn.trim() || loading} className="btn-glow" style={{ ...s.btn, opacity: !codeIn.trim() || loading ? 0.5 : 1 }}>{loading ? '⏳' : '🔍'} Analyze & Optimize</button>
+            </div>
+          </div>
+
+          <div style={{ ...s.panel, overflow: 'auto' }}>
+            <div style={s.panelH}><span style={{ fontSize: '12px', fontWeight: 600 }}>📊 Analysis Results</span></div>
+            <div style={{ flex: 1, padding: '12px', overflow: 'auto' }}>
+              {loading ? (
+                <div style={{ padding: '12px' }}>
+                  <Skeleton h="56px" style={{ marginBottom: '12px' }} />
+                  <Skeleton h="80px" style={{ marginBottom: '12px' }} />
+                  <Skeleton h="60px" />
+                </div>
+              ) : analysis ? (
+                <div className="fade-in">
+                  <div style={{ display: 'flex', gap: '12px', padding: '12px', background: 'var(--bg)', borderRadius: '8px', marginBottom: '12px' }}>
+                    <div style={{ width: '56px', height: '56px', borderRadius: '50%', border: '3px solid ' + (analysis.score >= 70 ? 'var(--success)' : analysis.score >= 40 ? 'var(--warning)' : 'var(--error)'), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '18px', fontWeight: 700, color: analysis.score >= 70 ? 'var(--success)' : analysis.score >= 40 ? 'var(--warning)' : 'var(--error)' }}>{analysis.score}</span>
+                    </div>
+                    <div style={{ flex: 1, fontSize: '11px' }}>
+                      <div style={{ marginBottom: '4px' }}><span style={{ color: 'var(--text-sec)' }}>Complexity:</span> <strong>{analysis.level}</strong></div>
+                      <div><span style={{ color: 'var(--text-sec)' }}>JOINs:</span> {analysis.joins}</div>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <h4 style={{ fontSize: '11px', color: 'var(--text-sec)', marginBottom: '8px' }}>🔴 Issues Found</h4>
+                    {analysis.issues.length === 0 ? (
+                      <div style={{ padding: '8px', background: 'rgba(16,185,129,0.1)', borderRadius: '6px', fontSize: '11px', color: 'var(--success)' }}>✅ No major issues detected</div>
+                    ) : analysis.issues.map((is, i) => (
+                      <div key={i} className={'severity-' + is.sev.toLowerCase()} style={{ padding: '8px', borderRadius: '6px', marginBottom: '4px', fontSize: '11px' }}>
+                        <span style={s.badge(is.sev === 'HIGH' ? 'var(--error)' : is.sev === 'MEDIUM' ? 'var(--warning)' : 'var(--accent)')}>{is.sev}</span>
+                        <div style={{ marginTop: '4px' }}>{is.msg}</div>
+                        <div style={{ color: 'var(--success)', marginTop: '2px' }}>💡 {is.fix}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: '11px', color: 'var(--text-sec)', marginBottom: '8px' }}>💡 Optimization Tips</h4>
+                    {analysis.suggestions.map((sg, i) => <div key={i} style={{ padding: '4px 0', fontSize: '10px', borderBottom: '1px solid var(--border)' }}>• {sg}</div>)}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                  <span style={{ fontSize: '40px', marginBottom: '10px', opacity: 0.5 }} className="float">📊</span>
+                  <span>Paste SQL and click Analyze</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={s.panel}>
+            <div style={s.panelH}>
+              <span style={{ fontSize: '12px', fontWeight: 600 }}>✨ Optimized SQL {autoComment && '(+comments)'}</span>
+              {codeOut && <button onClick={() => { navigator.clipboard.writeText(codeOut); toast('Copied!'); }} style={s.btn2}>📋 Copy</button>}
+            </div>
+            {codeOut ? (
+              <pre className="fade-in" style={{ flex: 1, padding: '12px', background: 'var(--bg)', color: 'var(--text)', fontFamily: '"JetBrains Mono",monospace', fontSize: '11px', lineHeight: 1.5, overflow: 'auto', margin: 0 }}>{codeOut}</pre>
+            ) : (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '40px', opacity: 0.5 }} className="float">✨</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Query Performance Analyzer - BOTTOM */}
+      <div style={{ ...s.card, flex: '0 0 auto', marginBottom: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            📈 Query Performance Analyzer
+            <Tip text="Analyze query performance using SQL code or Snowflake Query ID">
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', cursor: 'help' }}>ⓘ</span>
+            </Tip>
+          </h3>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              onClick={() => setPerfInputType('sql')} 
+              style={{ ...s.btn2, background: perfInputType === 'sql' ? 'var(--accent)' : 'var(--bg-input)', color: perfInputType === 'sql' ? '#fff' : 'var(--text-sec)' }}
+            >
+              SQL Code
+            </button>
+            <button 
+              onClick={() => setPerfInputType('queryid')} 
+              style={{ ...s.btn2, background: perfInputType === 'queryid' ? 'var(--accent)' : 'var(--bg-input)', color: perfInputType === 'queryid' ? '#fff' : 'var(--text-sec)' }}
+            >
+              Query ID
+            </button>
+          </div>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: perfResult ? '1fr 1.5fr' : '1fr', gap: '16px' }}>
+          <div>
+            <div style={{ marginBottom: '10px' }}>
+              {perfInputType === 'sql' ? (
+                <textarea
+                  value={perfInput}
+                  onChange={e => setPerfInput(e.target.value)}
+                  placeholder="Paste SQL query to analyze performance..."
+                  style={{ ...s.input, height: '100px', fontFamily: '"JetBrains Mono",monospace', fontSize: '11px', resize: 'none' }}
+                />
+              ) : (
+                <input
+                  value={perfInput}
+                  onChange={e => setPerfInput(e.target.value)}
+                  placeholder="Enter Snowflake Query ID (e.g., 01b4d5e1-0000-0000-0000-000000000000)"
+                  style={s.input}
+                />
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={analyzePerf}
+                disabled={!perfInput.trim() || perfLoading}
+                className="btn-glow"
+                style={{ ...s.btn, flex: 1, opacity: !perfInput.trim() || perfLoading ? 0.5 : 1 }}
+              >
+                {perfLoading ? '⏳' : '📈'} Analyze Performance
+              </button>
+              {perfInputType === 'sql' && codeIn && (
+                <Tip text="Use SQL from above">
+                  <button onClick={() => setPerfInput(codeIn)} style={s.btn2}>↑ Use Input</button>
+                </Tip>
+              )}
+            </div>
+          </div>
+
+          {perfResult && (
+            <div className="slide-in" style={{ background: 'var(--bg)', borderRadius: '8px', padding: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '14px' }}>
+                <Tip text="Estimated execution time">
+                  <div style={{ padding: '10px', background: 'var(--bg-input)', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--accent)' }}>{perfResult.time}</div>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Est. Time</div>
+                  </div>
+                </Tip>
+                <Tip text="Estimated compute cost">
+                  <div style={{ padding: '10px', background: 'var(--bg-input)', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--success)' }}>{perfResult.cost}</div>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Est. Cost</div>
+                  </div>
+                </Tip>
+                <Tip text="Data scanned">
+                  <div style={{ padding: '10px', background: 'var(--bg-input)', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--warning)' }}>{perfResult.bytes}</div>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Bytes Scanned</div>
+                  </div>
+                </Tip>
+                <Tip text="Partition pruning efficiency">
+                  <div style={{ padding: '10px', background: 'var(--bg-input)', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--accent2)' }}>{perfResult.partitionsPruned}</div>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Pruned</div>
+                  </div>
+                </Tip>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-sec)', marginBottom: '6px' }}>Optimization Suggestions</div>
+                  {perfResult.opts.map((o, i) => (
+                    <div key={i} className={'severity-' + o.sev} style={{ padding: '6px 8px', borderRadius: '4px', marginBottom: '4px', fontSize: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600 }}>{o.issue}</span>
+                        <span style={{ fontSize: '8px', padding: '1px 4px', background: 'rgba(0,0,0,0.2)', borderRadius: '3px' }}>{o.impact}</span>
+                      </div>
+                      <div style={{ marginTop: '2px', opacity: 0.8 }}>💡 {o.fix}</div>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-sec)', marginBottom: '6px' }}>Execution Plan</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' }}>
+                    {perfResult.plan.map((p, i) => (
+                      <React.Fragment key={i}>
+                        <Tip text={'Rows: ' + p.rows + ', Cost: ' + p.cost + '%'}>
+                          <div style={{ padding: '6px 10px', background: 'var(--bg-input)', borderRadius: '4px', fontSize: '9px', cursor: 'help' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{p.op}</div>
+                            {p.table !== '-' && <div style={{ color: 'var(--text-muted)' }}>{p.table}</div>}
+                          </div>
+                        </Tip>
+                        {i < perfResult.plan.length - 1 && <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>→</span>}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: '8px', fontSize: '9px', color: 'var(--text-muted)' }}>Query ID: {perfResult.queryId}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // SQL Formatter
+  const SqlFormatter = () => (
+    <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', height: 'calc(100vh - var(--header) - 40px)' }}>
+      <div style={s.panel}>
+        <div style={s.panelH}>
+          <span style={{ fontSize: '12px', fontWeight: 600 }}>📝 Input</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <select value={fmtStyle} onChange={e => setFmtStyle(e.target.value)} style={{ padding: '4px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text)', fontSize: '11px' }}>
+              <option value="compact">Compact</option>
+              <option value="standard">Standard</option>
+              <option value="expanded">Expanded</option>
+            </select>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--text-sec)', cursor: 'pointer' }}>
+              <span>Comments</span>
+              <div className={'toggle-switch ' + (fmtComment ? 'active' : '')} onClick={() => setFmtComment(!fmtComment)} />
+            </label>
+          </div>
+        </div>
+        <textarea value={sqlIn} onChange={e => setSqlIn(e.target.value)} placeholder="Paste SQL..." style={s.editor} />
+        <div style={{ padding: '10px', borderTop: '1px solid var(--border)' }}>
+          <button onClick={() => { let f = formatSQL(sqlIn, fmtStyle); if (fmtComment) f = addComments(f); setSqlOut(f); toast('Formatted!'); }} disabled={!sqlIn.trim()} className="btn-glow" style={{ ...s.btn, opacity: !sqlIn.trim() ? 0.5 : 1 }}>✨ Format</button>
+        </div>
+      </div>
+      <div style={s.panel}>
+        <div style={s.panelH}>
+          <span style={{ fontSize: '12px', fontWeight: 600 }}>✨ Formatted</span>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {sqlOut && vscode && <Tip text="Send to VS Code"><button onClick={() => sendToVS(sqlOut)} style={s.btn2}>💻</button></Tip>}
+            {sqlOut && <button onClick={() => { navigator.clipboard.writeText(sqlOut); toast('Copied!'); }} style={s.btn2}>📋</button>}
+          </div>
+        </div>
+        {sqlOut ? (
+          <pre className="fade-in" style={{ flex: 1, padding: '12px', background: 'var(--bg)', color: 'var(--text)', fontFamily: '"JetBrains Mono",monospace', fontSize: '11px', lineHeight: 1.5, overflow: 'auto', margin: 0 }}>{sqlOut}</pre>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>Output here</div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Documentation
+  const Documentation = () => (
+    <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', height: 'calc(100vh - var(--header) - 40px)' }}>
+      <div style={s.panel}>
+        <div style={s.panelH}>
+          <span style={{ fontSize: '12px', fontWeight: 600 }}>📝 Code</span>
+          <select value={docType} onChange={e => setDocType(e.target.value)} style={{ padding: '4px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text)', fontSize: '11px' }}>
+            <option value="technical">Technical</option>
+            <option value="business">Business</option>
+            <option value="inline">Inline</option>
+          </select>
+        </div>
+        <textarea value={docIn} onChange={e => setDocIn(e.target.value)} placeholder="Paste code..." style={s.editor} />
+        <div style={{ padding: '10px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={genDocs} disabled={!docIn.trim() || loading} className="btn-glow" style={{ ...s.btn, opacity: !docIn.trim() || loading ? 0.5 : 1 }}>{loading ? '⏳' : '📝'} Generate</button>
+        </div>
+      </div>
+      <div style={s.panel}>
+        <div style={s.panelH}>
+          <span style={{ fontSize: '12px', fontWeight: 600 }}>📄 Documentation</span>
+          {docOut && <button onClick={() => { navigator.clipboard.writeText(docOut); toast('Copied!'); }} style={s.btn2}>📋</button>}
+        </div>
+        {loading ? (
+          <div style={{ flex: 1, padding: '12px' }}>
+            <Skeleton h="24px" style={{ marginBottom: '12px' }} />
+            <Skeleton h="100px" />
+          </div>
+        ) : docOut ? (
+          <pre className="fade-in" style={{ flex: 1, padding: '12px', background: 'var(--bg)', color: 'var(--text)', fontFamily: '"JetBrains Mono",monospace', fontSize: '11px', lineHeight: 1.5, overflow: 'auto', margin: 0, whiteSpace: 'pre-wrap' }}>{docOut}</pre>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>📄 Docs here</div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Test Generator
+  const TestGenerator = () => (
+    <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', height: 'calc(100vh - var(--header) - 40px)' }}>
+      <div style={s.panel}>
+        <div style={s.panelH}>
+          <span style={{ fontSize: '12px', fontWeight: 600 }}>📝 Query</span>
+          <select value={testFw} onChange={e => setTestFw(e.target.value)} style={{ padding: '4px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text)', fontSize: '11px' }}>
+            <option value="snowflake">Snowflake SQL</option>
+            <option value="dbt">dbt</option>
+            <option value="gx">Great Expectations</option>
+          </select>
+        </div>
+        <textarea value={testIn} onChange={e => setTestIn(e.target.value)} placeholder="Paste query..." style={s.editor} />
+        <div style={{ padding: '10px', borderTop: '1px solid var(--border)' }}>
+          <button onClick={genTests} disabled={!testIn.trim() || loading} className="btn-glow" style={{ ...s.btn, opacity: !testIn.trim() || loading ? 0.5 : 1 }}>{loading ? '⏳' : '🧪'} Generate</button>
+        </div>
+      </div>
+      <div style={s.panel}>
+        <div style={s.panelH}>
+          <span style={{ fontSize: '12px', fontWeight: 600 }}>🧪 Tests</span>
+          {testOut && <button onClick={() => { navigator.clipboard.writeText(testOut); toast('Copied!'); }} style={s.btn2}>📋</button>}
+        </div>
+        {loading ? (
+          <div style={{ flex: 1, padding: '12px' }}>
+            <Skeleton h="40px" style={{ marginBottom: '12px' }} />
+            <Skeleton h="80px" />
+          </div>
+        ) : testOut ? (
+          <pre className="fade-in" style={{ flex: 1, padding: '12px', background: 'var(--bg)', color: 'var(--text)', fontFamily: '"JetBrains Mono",monospace', fontSize: '11px', lineHeight: 1.4, overflow: 'auto', margin: 0, whiteSpace: 'pre-wrap' }}>{testOut}</pre>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>🧪 Tests here</div>
+        )}
+      </div>
+    </div>
+  );
+
+  // GitHub - Same as previous version
+  const GitHub = () => (
+    <div className="fade-in">
+      {!auth.github ? (
+        <div style={{ ...s.card, textAlign: 'center', padding: '60px' }} className="scale-in">
+          <span style={{ fontSize: '64px' }} className="float">🔐</span>
+          <h3 style={{ fontSize: '20px', margin: '16px 0' }}>GitHub Auth Required</h3>
+          <p style={{ color: 'var(--text-sec)', marginBottom: '24px' }}>Connect to create PRs</p>
+          <button onClick={() => setModal('github')} className="btn-glow" style={s.btn}>🔗 Connect GitHub</button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={s.card} className="slide-in">
+            <h3 style={{ fontSize: '15px', marginBottom: '16px' }}>🔗 Create Pull Request</h3>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-sec)', display: 'block', marginBottom: '4px' }}>Title *</label>
+              <input value={prTitle} onChange={e => setPrTitle(e.target.value)} placeholder="feat: Optimize query" style={s.input} />
+            </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-sec)', display: 'block', marginBottom: '4px' }}>Target Branch *</label>
+              <select value={prBranch} onChange={e => setPrBranch(e.target.value)} style={s.input}>
+                {BRANCHES.map(b => <option key={b.id} value={b.id}>{b.name} {b.protected && '🔒'}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-sec)', display: 'block', marginBottom: '4px' }}>Files</label>
+              <div style={{ background: 'var(--bg-input)', borderRadius: '6px', padding: '10px', fontSize: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}><input type="checkbox" defaultChecked /> optimized.sql</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}><input type="checkbox" defaultChecked /> docs.md</label>
+              </div>
+            </div>
+            <div style={{ marginBottom: '14px', padding: '12px', background: 'var(--bg)', borderRadius: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={namingCheck} onChange={e => setNamingCheck(e.target.checked)} />
+                  <span>📋 Naming Check</span>
+                </label>
+                <button onClick={runNaming} disabled={loading} style={{ ...s.btn2, padding: '4px 10px', fontSize: '10px' }}>{loading ? '⏳' : '🔍'} Run</button>
+              </div>
+              {namingRes && (
+                <div style={{ fontSize: '11px' }} className="fade-in">
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
+                    <span style={{ color: 'var(--success)' }}>✅ {namingRes.passed}</span>
+                    <span style={{ color: 'var(--error)' }}>❌ {namingRes.failed}</span>
+                    <span style={{ color: 'var(--warning)' }}>⚠️ {namingRes.warnings}</span>
+                  </div>
+                  <div style={{ maxHeight: '100px', overflow: 'auto' }}>
+                    {namingRes.details.map((d, i) => (
+                      <div key={i} className={'severity-' + (d.status === 'pass' ? 'low' : d.status === 'fail' ? 'high' : 'medium')} style={{ padding: '6px', borderRadius: '4px', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <code style={{ color: 'var(--accent)' }}>{d.name}</code>
+                          <span style={s.badge(d.status === 'pass' ? 'var(--success)' : d.status === 'fail' ? 'var(--error)' : 'var(--warning)')}>{d.status.toUpperCase()}</span>
+                        </div>
+                        {d.sug && <div style={{ color: 'var(--success)', fontSize: '10px' }}>💡 {d.sug}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <button onClick={createPR} disabled={!prTitle.trim() || loading} className="btn-glow" style={{ ...s.btn, width: '100%', opacity: !prTitle.trim() || loading ? 0.5 : 1 }}>{loading ? '⏳' : '🚀'} Create PR</button>
+          </div>
+          <div style={s.card} className="slide-in">
+            <h3 style={{ fontSize: '15px', marginBottom: '16px' }}>📜 Recent PRs</h3>
+            {prs.map((p, i) => (
+              <div key={p.id} className="card-lift" style={{ padding: '12px', background: 'var(--bg-input)', borderRadius: '8px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 600, fontSize: '13px' }}>#{p.id} {p.title}</span>
+                  <span className={p.status === 'open' ? 'status-pulse' : ''} style={s.badge(p.status === 'merged' ? 'var(--accent2)' : 'var(--success)')}>{p.status}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' }}>
+                  <span>→ {p.branch}</span>
+                  <span>{p.date}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Job Monitor - With Notifications
+  const [notifySettings, setNotifySettings] = useState({
+    email: true,
+    teams: true,
+    sms: false,
+    onCompletion: true,
+    onFailure: true,
+    onLongRunning: true,
+    longRunThreshold: 100
+  });
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
+  const [notifyJob, setNotifyJob] = useState(null);
+
+  const sendNotification = (job, channel) => {
+    const channelNames = { email: 'Email', teams: 'Teams', sms: 'SMS' };
+    toast('Notification sent via ' + channelNames[channel] + ' for ' + job.name + '!');
+  };
+
+  const JobMonitor = () => (
+    <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '16px' }}>
+      <div style={s.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h3 style={{ fontSize: '15px' }}>⚙️ Jobs</h3>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => { setNotifyJob(null); setShowNotifyModal(true); }} style={s.btn2}>🔔 Alert Settings</button>
+            <button onClick={() => toast('Refreshed!')} style={s.btn2}>🔄 Refresh</button>
+          </div>
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              {['Name', 'Status', 'Progress', 'Avg Time', 'Warehouse', 'Actions'].map(h => (
+                <th key={h} style={{ padding: '10px', textAlign: 'left', fontSize: '11px', color: 'var(--text-sec)', background: 'var(--bg-input)', borderBottom: '1px solid var(--border)' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {jobs.map((j, i) => {
+              const isLongRunning = j.status === 'RUNNING' && j.prog && j.avgTime && (j.prog / 100 * j.avgTime) > j.avgTime;
+              const runPercent = j.status === 'RUNNING' && j.avgTime ? Math.round((j.prog || 0) / 100 * 150) : null;
+              return (
+                <tr key={j.id} onClick={() => setSelJob(j)} style={{ cursor: 'pointer', background: selJob?.id === j.id ? 'rgba(99,102,241,0.1)' : isLongRunning ? 'rgba(239,68,68,0.05)' : 'transparent' }}>
+                  <td style={{ padding: '10px', fontSize: '13px', fontWeight: 500, borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {j.name}
+                      {j.critical && <span style={{ fontSize: '10px', color: 'var(--error)' }}>🔴</span>}
+                      {isLongRunning && <span style={{ fontSize: '10px', color: 'var(--warning)' }}>⏱️</span>}
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px', borderBottom: '1px solid var(--border)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className={j.status === 'RUNNING' ? 'status-pulse' : ''} style={{ width: '6px', height: '6px', borderRadius: '50%', background: j.status === 'RUNNING' ? (isLongRunning ? 'var(--error)' : 'var(--warning)') : j.status === 'SUCCESS' ? 'var(--success)' : j.status === 'FAILED' ? 'var(--error)' : 'var(--accent)' }} />
+                      <span style={s.badge(j.status === 'RUNNING' ? (isLongRunning ? 'var(--error)' : 'var(--warning)') : j.status === 'SUCCESS' ? 'var(--success)' : j.status === 'FAILED' ? 'var(--error)' : 'var(--accent)')}>{j.status}{isLongRunning && ' ⚠️'}</span>
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px', borderBottom: '1px solid var(--border)', width: '100px' }}>
+                    {j.status === 'RUNNING' && j.prog ? (
+                      <div>
+                        <div className="progress-bar" style={{ width: '70px' }}>
+                          <div className="progress-fill" style={{ width: j.prog + '%', background: isLongRunning ? 'var(--error)' : 'linear-gradient(90deg,var(--accent),var(--accent2))' }} />
+                        </div>
+                        {runPercent && <span style={{ fontSize: '9px', color: runPercent > 100 ? 'var(--error)' : 'var(--text-muted)' }}>{runPercent}% of avg</span>}
+                      </div>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>-</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px', fontSize: '11px', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>{j.avgTime ? j.avgTime + 'm' : '-'}</td>
+                  <td style={{ padding: '10px', fontSize: '11px', fontFamily: 'monospace', borderBottom: '1px solid var(--border)' }}>{j.wh}</td>
+                  <td style={{ padding: '10px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {j.status === 'FAILED' && (
+                        <Tip text="Retry job">
+                          <button onClick={e => { e.stopPropagation(); retryJob(j); }} style={s.btn2}>🔄</button>
+                        </Tip>
+                      )}
+                      {j.critical && (
+                        <Tip text="Send notification">
+                          <button onClick={e => { e.stopPropagation(); setNotifyJob(j); setShowNotifyModal(true); }} style={{ ...s.btn2, padding: '4px 8px' }}>🔔</button>
+                        </Tip>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        
+        {/* Legend */}
+        <div style={{ marginTop: '12px', padding: '10px', background: 'var(--bg-input)', borderRadius: '8px', display: 'flex', gap: '16px', fontSize: '10px', color: 'var(--text-muted)' }}>
+          <span><span style={{ color: 'var(--error)' }}>🔴</span> Critical Job</span>
+          <span><span style={{ color: 'var(--warning)' }}>⏱️</span> Running &gt;100% avg time</span>
+          <span><span style={{ color: 'var(--success)' }}>✓</span> Notifications enabled</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={s.card}>
+          <h3 style={{ fontSize: '15px', marginBottom: '16px' }}>📋 Job Details</h3>
+          {selJob ? (
+            <div className="fade-in">
+              <div style={{ padding: '14px', background: 'var(--bg-input)', borderRadius: '10px', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                  <h4 style={{ fontSize: '14px' }}>{selJob.name}</h4>
+                  {selJob.critical && <span style={s.badge('var(--error)')}>CRITICAL</span>}
+                </div>
+                <div style={{ fontSize: '12px', marginBottom: '6px' }}><span style={{ color: 'var(--text-sec)' }}>Warehouse:</span> {selJob.wh}</div>
+                <div style={{ fontSize: '12px', marginBottom: '6px' }}><span style={{ color: 'var(--text-sec)' }}>Last Run:</span> {selJob.lastRun || selJob.nextRun}</div>
+                <div style={{ fontSize: '12px', marginBottom: '6px' }}><span style={{ color: 'var(--text-sec)' }}>Avg Runtime:</span> {selJob.avgTime ? selJob.avgTime + ' min' : 'N/A'}</div>
+                <span className={selJob.status === 'RUNNING' ? 'status-pulse' : ''} style={s.badge(selJob.status === 'RUNNING' ? 'var(--warning)' : selJob.status === 'SUCCESS' ? 'var(--success)' : selJob.status === 'FAILED' ? 'var(--error)' : 'var(--accent)')}>{selJob.status}</span>
+              </div>
+              {selJob.error && (
+                <div className="severity-high" style={{ padding: '12px', borderRadius: '8px', marginBottom: '14px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>❌ Error</div>
+                  <div style={{ fontSize: '12px', marginBottom: '8px' }}>{selJob.error}</div>
+                  {selJob.fix && <div style={{ fontSize: '11px', color: 'var(--success)', marginBottom: '10px' }}>💡 {selJob.fix}</div>}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => toast('Fix applied!')} style={s.btnSuccess}>✨ Apply Fix</button>
+                    <button onClick={() => retryJob(selJob)} style={s.btn2}>🔄 Retry</button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Quick Notify for selected job */}
+              {selJob.critical && (
+                <div style={{ padding: '12px', background: 'var(--bg)', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '10px', color: 'var(--text-sec)' }}>📣 Send Notification</div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Tip text="Send email notification">
+                      <button onClick={() => sendNotification(selJob, 'email')} style={{ ...s.btn2, display: 'flex', alignItems: 'center', gap: '4px' }}>📧 Email</button>
+                    </Tip>
+                    <Tip text="Send Teams notification">
+                      <button onClick={() => sendNotification(selJob, 'teams')} style={{ ...s.btn2, display: 'flex', alignItems: 'center', gap: '4px' }}>💬 Teams</button>
+                    </Tip>
+                    <Tip text="Send SMS notification">
+                      <button onClick={() => sendNotification(selJob, 'sms')} style={{ ...s.btn2, display: 'flex', alignItems: 'center', gap: '4px' }}>📱 SMS</button>
+                    </Tip>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '40px', opacity: 0.5 }} className="float">📋</span>
+              <p style={{ marginTop: '10px' }}>Select a job</p>
+            </div>
+          )}
+        </div>
+
+        {/* Notification Settings Panel */}
+        <div style={s.card}>
+          <h3 style={{ fontSize: '15px', marginBottom: '12px' }}>🔔 Alert Configuration</h3>
+          
+          <div style={{ marginBottom: '14px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-sec)', marginBottom: '8px' }}>Notification Channels</div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {[
+                { id: 'email', icon: '📧', label: 'Email' },
+                { id: 'teams', icon: '💬', label: 'Teams' },
+                { id: 'sms', icon: '📱', label: 'SMS' }
+              ].map(ch => (
+                <button
+                  key={ch.id}
+                  onClick={() => setNotifySettings(prev => ({ ...prev, [ch.id]: !prev[ch.id] }))}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: notifySettings[ch.id] ? 'rgba(99,102,241,0.2)' : 'var(--bg-input)',
+                    border: '1px solid ' + (notifySettings[ch.id] ? 'var(--accent)' : 'var(--border)'),
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    color: notifySettings[ch.id] ? 'var(--accent)' : 'var(--text-sec)',
+                    fontSize: '11px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }}>{ch.icon}</span>
+                  <span>{ch.label}</span>
+                  {notifySettings[ch.id] && <span style={{ fontSize: '10px', color: 'var(--success)' }}>✓ On</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div style={{ marginBottom: '14px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-sec)', marginBottom: '8px' }}>Alert Triggers (Critical Jobs Only)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: 'var(--bg-input)', borderRadius: '8px', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px' }}>✅</span>
+                  <span style={{ fontSize: '12px' }}>Job Completion</span>
+                </div>
+                <div className={'toggle-switch ' + (notifySettings.onCompletion ? 'active' : '')} onClick={() => setNotifySettings(prev => ({ ...prev, onCompletion: !prev.onCompletion }))} />
+              </label>
+              
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: 'var(--bg-input)', borderRadius: '8px', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px' }}>❌</span>
+                  <span style={{ fontSize: '12px' }}>Job Failure</span>
+                </div>
+                <div className={'toggle-switch ' + (notifySettings.onFailure ? 'active' : '')} onClick={() => setNotifySettings(prev => ({ ...prev, onFailure: !prev.onFailure }))} />
+              </label>
+              
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: 'var(--bg-input)', borderRadius: '8px', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px' }}>⏱️</span>
+                  <span style={{ fontSize: '12px' }}>Running &gt; {notifySettings.longRunThreshold}% of Avg Time</span>
+                </div>
+                <div className={'toggle-switch ' + (notifySettings.onLongRunning ? 'active' : '')} onClick={() => setNotifySettings(prev => ({ ...prev, onLongRunning: !prev.onLongRunning }))} />
+              </label>
+            </div>
+          </div>
+          
+          {notifySettings.onLongRunning && (
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-sec)', marginBottom: '6px' }}>Long Running Threshold</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="range"
+                  min="100"
+                  max="200"
+                  step="10"
+                  value={notifySettings.longRunThreshold}
+                  onChange={e => setNotifySettings(prev => ({ ...prev, longRunThreshold: parseInt(e.target.value) }))}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', minWidth: '50px' }}>{notifySettings.longRunThreshold}%</span>
+              </div>
+            </div>
+          )}
+          
+          <button onClick={() => toast('Alert settings saved!')} className="btn-glow" style={{ ...s.btn, width: '100%' }}>💾 Save Settings</button>
+        </div>
+      </div>
+      
+      {/* Notification Modal */}
+      {showNotifyModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} className="fade-in">
+          <div className="scale-in" style={{ width: '100%', maxWidth: '450px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '16px' }}>🔔 {notifyJob ? 'Send Notification' : 'Alert Settings'}</h3>
+              <button onClick={() => setShowNotifyModal(false)} style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--bg-input)', border: 'none', color: 'var(--text-sec)', cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ padding: '20px' }}>
+              {notifyJob ? (
+                <>
+                  <div style={{ padding: '14px', background: 'var(--bg-input)', borderRadius: '10px', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>{notifyJob.name}</div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <span style={s.badge(notifyJob.status === 'FAILED' ? 'var(--error)' : 'var(--warning)')}>{notifyJob.status}</span>
+                      {notifyJob.critical && <span style={s.badge('var(--error)')}>CRITICAL</span>}
+                    </div>
+                  </div>
+                  
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-sec)', marginBottom: '8px' }}>Select notification channels:</div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => { sendNotification(notifyJob, 'email'); setShowNotifyModal(false); }} className="card-lift" style={{ flex: 1, padding: '16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', color: 'var(--text)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '24px' }}>📧</span>
+                        <span style={{ fontSize: '12px' }}>Email</span>
+                      </button>
+                      <button onClick={() => { sendNotification(notifyJob, 'teams'); setShowNotifyModal(false); }} className="card-lift" style={{ flex: 1, padding: '16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', color: 'var(--text)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '24px' }}>💬</span>
+                        <span style={{ fontSize: '12px' }}>Teams</span>
+                      </button>
+                      <button onClick={() => { sendNotification(notifyJob, 'sms'); setShowNotifyModal(false); }} className="card-lift" style={{ flex: 1, padding: '16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', color: 'var(--text)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '24px' }}>📱</span>
+                        <span style={{ fontSize: '12px' }}>SMS</span>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div style={{ padding: '10px', background: 'var(--bg)', borderRadius: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    💡 Notifications are only available for critical jobs
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: '12px', color: 'var(--text-sec)', marginBottom: '16px' }}>Configure alert settings in the panel on the right.</p>
+                  <button onClick={() => setShowNotifyModal(false)} className="btn-glow" style={s.btn}>Got it</button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Knowledge Base - Same as previous version
+  const KnowledgeBase = () => (
+    <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '14px', height: 'calc(100vh - var(--header) - 40px)' }}>
+      <div style={s.panel}>
+        <div style={s.panelH}><span style={{ fontSize: '12px', fontWeight: 600 }}>🔍 Search</span></div>
+        <div style={{ padding: '12px' }}>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input value={kbQ} onChange={e => setKbQ(e.target.value)} onKeyPress={e => e.key === 'Enter' && searchKB()} placeholder="Search tables..." style={{ ...s.input, flex: 1 }} />
+            <button onClick={searchKB} className="btn-glow" style={{ ...s.btn, padding: '8px 12px' }}>🔍</button>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto', padding: '0 12px 12px' }}>
+          {loading ? [1, 2, 3].map(i => <div key={i} style={{ padding: '12px', marginBottom: '8px' }}><Skeleton h="20px" style={{ marginBottom: '8px' }} /><Skeleton h="40px" /></div>) : kbRes.map((r, i) => (
+            <div key={i} className="card-lift" style={{ padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', marginBottom: '8px', borderLeft: '3px solid ' + (SOURCES.find(x => x.id === r.src)?.color || 'var(--border)') }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: 600, background: SOURCES.find(x => x.id === r.src)?.color || 'var(--bg)', color: '#fff' }}>{r.src}</span>
+                <span style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--accent)' }}>{r.tbl}</span>
+              </div>
+              <h4 style={{ fontSize: '13px', marginBottom: '4px' }}>{r.title}</h4>
+              <p style={{ fontSize: '11px', color: 'var(--text-sec)' }}>{r.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={s.panel}>
+        <div style={s.panelH}><span style={{ fontSize: '12px', fontWeight: 600 }}>💬 Knowledge Agent</span></div>
+        <div style={{ flex: 1, overflow: 'auto', padding: '12px' }}>
+          {kbChat.length === 0 ? (
+            <div className="fade-in" style={{ padding: '20px', background: 'var(--bg-input)', borderRadius: '12px', textAlign: 'center' }}>
+              <h4 style={{ fontSize: '16px', marginBottom: '10px' }}>👋 Welcome!</h4>
+              <p style={{ fontSize: '12px', color: 'var(--text-sec)', marginBottom: '16px' }}>Ask about source systems</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px', marginBottom: '16px' }}>
+                {SOURCES.map(src => <span key={src.id} style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px', color: '#fff', background: src.color }}>{src.icon} {src.id}</span>)}
+              </div>
+              {['What is BSEG?', 'Customer tables'].map((q, i) => (
+                <button key={i} onClick={() => sendKB(q)} className="card-lift" style={{ display: 'block', width: '100%', padding: '10px', marginBottom: '6px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', cursor: 'pointer', textAlign: 'left', fontSize: '12px' }}>💬 {q}</button>
+              ))}
+            </div>
+          ) : kbChat.map((m, i) => (
+            <div key={i} className="fade-in" style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexDirection: m.role === 'user' ? 'row-reverse' : 'row' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: m.role === 'user' ? 'var(--bg-input)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>{m.role === 'user' ? '👤' : '🔷'}</div>
+              <div style={{ maxWidth: '80%', padding: '10px 14px', background: m.role === 'user' ? 'var(--accent)' : 'var(--bg-input)', borderRadius: '12px' }}>
+                <pre style={{ fontSize: '12px', lineHeight: 1.5, whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit', color: m.role === 'user' ? '#fff' : 'var(--text)' }}>{m.msg}</pre>
+              </div>
+            </div>
+          ))}
+          {loading && <div style={{ display: 'flex', gap: '10px' }}><div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🔷</div><div style={{ padding: '10px 14px', background: 'var(--bg-input)', borderRadius: '12px' }}><span style={{ animation: 'pulse 1.5s infinite' }}>Thinking...</span></div></div>}
+        </div>
+        <div style={{ padding: '12px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px' }}>
+          <input value={kbQ} onChange={e => setKbQ(e.target.value)} onKeyPress={e => e.key === 'Enter' && kbQ.trim() && sendKB(kbQ)} placeholder="Ask..." style={{ ...s.input, flex: 1 }} />
+          <button onClick={() => kbQ.trim() && sendKB(kbQ)} disabled={!kbQ.trim() || loading} className="btn-glow" style={{ ...s.btn, opacity: !kbQ.trim() || loading ? 0.5 : 1 }}>📤</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Data Lineage - Same as previous version
+  const DataLineage = () => (
+    <div className="fade-in" style={s.card}>
+      <h3 style={{ fontSize: '15px', marginBottom: '16px' }}>🔀 Data Lineage</h3>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <input value={lineQ} onChange={e => setLineQ(e.target.value)} placeholder="Table name (e.g., ANALYTICS.SUMMARY)" style={{ ...s.input, flex: 1 }} />
+        <button onClick={traceLine} disabled={!lineQ.trim() || loading} className="btn-glow" style={{ ...s.btn, opacity: !lineQ.trim() || loading ? 0.5 : 1 }}>{loading ? '⏳' : '🔍'} Trace</button>
+      </div>
+      {loading ? (
+        <div style={{ padding: '40px', display: 'flex', justifyContent: 'center', gap: '20px' }}>
+          <Skeleton w="120px" h="80px" />
+          <Skeleton w="40px" h="40px" style={{ alignSelf: 'center' }} />
+          <Skeleton w="120px" h="80px" />
+        </div>
+      ) : lineData ? (
+        <div className="fade-in" style={{ padding: '24px', background: 'var(--bg-input)', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {lineData.sources.map((src, i) => (
+                <div key={i} className="card-lift" style={{ padding: '12px 18px', background: 'linear-gradient(135deg,#6366f120,#6366f110)', border: '2px solid #6366f1', borderRadius: '10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', color: '#6366f1', marginBottom: '4px' }}>SOURCE</div>
+                  <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 600 }}>{src}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: '24px', color: 'var(--text-muted)' }} className="float">→</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {lineData.transforms.map((t, i) => (
+                <div key={i} className="card-lift" style={{ padding: '12px 18px', background: 'linear-gradient(135deg,#8b5cf620,#8b5cf610)', border: '2px solid #8b5cf6', borderRadius: '10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', color: '#8b5cf6', marginBottom: '4px' }}>TRANSFORM</div>
+                  <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 600 }}>{t}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: '24px', color: 'var(--text-muted)' }} className="float">→</div>
+            <div className="card-lift scale-in" style={{ padding: '16px 24px', background: 'linear-gradient(135deg,#10b98120,#10b98110)', border: '2px solid #10b981', borderRadius: '10px', textAlign: 'center' }}>
+              <div style={{ fontSize: '10px', color: '#10b981', marginBottom: '4px' }}>TARGET</div>
+              <div style={{ fontSize: '14px', fontFamily: 'monospace', fontWeight: 600 }}>{lineData.target}</div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ padding: '50px', background: 'var(--bg-input)', borderRadius: '12px', textAlign: 'center' }}>
+          <span style={{ fontSize: '56px', opacity: 0.5 }} className="float">🔀</span>
+          <p style={{ color: 'var(--text-muted)', marginTop: '16px' }}>Enter table name to trace lineage</p>
+        </div>
+      )}
+    </div>
+  );
+
+  // Snippets - Same as previous version
+  const Snippets = () => (
+    <div className="fade-in">
+      <h3 style={{ fontSize: '16px', marginBottom: '16px' }}>📦 Code Snippets</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: '16px' }}>
+        {snippets.map((sn, i) => (
+          <div key={sn.id} className="card-lift" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 600 }}>{sn.name}</h4>
+              <span style={{ padding: '3px 8px', background: 'var(--accent)', borderRadius: '6px', fontSize: '10px', color: '#fff' }}>{sn.cat}</span>
+            </div>
+            <pre style={{ background: 'var(--bg)', padding: '12px', borderRadius: '8px', fontFamily: '"JetBrains Mono",monospace', fontSize: '11px', lineHeight: 1.4, maxHeight: '120px', overflow: 'auto', marginBottom: '12px' }}>{sn.code}</pre>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button onClick={() => { navigator.clipboard.writeText(sn.code); toast('Copied!'); }} style={s.btn2}>📋 Copy</button>
+              {vscode && <Tip text="Send to VS Code"><button onClick={() => sendToVS(sn.code)} style={s.btn2}>💻</button></Tip>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Settings - Same as previous version
+  const Settings = () => (
+    <div className="fade-in" style={{ maxWidth: '700px' }}>
+      <div style={s.card}>
+        <h3 style={{ fontSize: '15px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          💻 VS Code Integration
+          <Tip text="Connect for seamless code transfer"><span style={{ fontSize: '12px', color: 'var(--text-muted)', cursor: 'help' }}>ⓘ</span></Tip>
+        </h3>
+        <div style={{ padding: '16px', background: 'var(--bg-input)', borderRadius: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600 }}>VS Code Connection</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{vscode ? 'Connected and ready' : 'Not connected'}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {vscode && <span className="status-pulse" style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)' }} />}
+              <button onClick={() => vscode ? setVscode(false) : setModal('vscode')} style={vscode ? s.btnDanger : s.btn}>{vscode ? '🔌 Disconnect' : '🔗 Connect'}</button>
+            </div>
+          </div>
+          {vscode && (
+            <div style={{ marginTop: '12px', padding: '12px', background: 'var(--bg)', borderRadius: '8px', fontSize: '12px' }}>
+              <div style={{ marginBottom: '8px', color: 'var(--text-sec)' }}>Features enabled:</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {['Send code', 'Open files', 'Sync snippets', 'Run commands'].map(f => <span key={f} style={{ padding: '4px 8px', background: 'rgba(16,185,129,0.2)', borderRadius: '4px', fontSize: '10px', color: 'var(--success)' }}>✓ {f}</span>)}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={s.card}>
+        <h3 style={{ fontSize: '15px', marginBottom: '16px' }}>🤖 LLM Preferences</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          {['Code Analysis', 'Documentation', 'Test Generation', 'Knowledge Base'].map((task, i) => (
+            <div key={task}>
+              <label style={{ fontSize: '11px', color: 'var(--text-sec)', display: 'block', marginBottom: '6px' }}>{task}</label>
+              <select style={s.input}>{LLMS.map(m => <option key={m.id} value={m.id}>{m.icon} {m.name}</option>)}</select>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={s.card}>
+        <h3 style={{ fontSize: '15px', marginBottom: '16px' }}>🔗 Connections</h3>
+        {ENVS.map((e, i) => (
+          <div key={e.id} className="card-lift" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-input)', borderRadius: '8px', marginBottom: '8px' }}>
+            <span>{e.icon} {e.id}</span>
+            <span style={{ fontSize: '12px', color: auth[e.id] ? 'var(--success)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {auth[e.id] && <span className="status-pulse" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)' }} />}
+              {auth[e.id] ? '✅ Connected' : '🔒'}
+            </span>
+          </div>
+        ))}
+        <div className="card-lift" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-input)', borderRadius: '8px' }}>
+          <span>🔗 GitHub</span>
+          <span style={{ fontSize: '12px', color: auth.github ? 'var(--success)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {auth.github && <span className="status-pulse" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)' }} />}
+            {auth.github ? '✅ Connected' : '🔒'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Sidebar
+  const Sidebar = () => (
+    <aside style={{ width: collapsed ? '60px' : 'var(--sidebar)', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', position: 'fixed', height: '100vh', transition: 'width 0.3s', zIndex: 100 }}>
+      <div style={{ padding: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '24px' }} className="float">🔷</span>
+          {!collapsed && (
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 700, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>EDW Nexus</div>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Command Center</div>
+            </div>
+          )}
+        </div>
+        <button onClick={() => setCollapsed(!collapsed)} style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-sec)', cursor: 'pointer' }}>{collapsed ? '→' : '←'}</button>
+      </div>
+      {!collapsed && (
+        <div style={{ padding: '10px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px' }}>Environment</div>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {ENVS.map(e => (
+              <Tip key={e.id} text={'Switch to ' + e.id}>
+                <button onClick={() => { if (e.auth && !auth[e.id]) setModal('snowflake'); else { setEnv(e.id); toast('Switched to ' + e.id); } }} style={{ flex: 1, padding: '6px', borderRadius: '6px', background: env === e.id ? e.color : 'var(--bg-input)', border: '1px solid ' + (env === e.id ? e.color : 'var(--border)'), color: env === e.id ? '#fff' : 'var(--text-sec)', cursor: 'pointer', fontSize: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                  <span>{e.icon}</span>
+                  <span>{e.id}</span>
+                  {e.auth && !auth[e.id] && <span style={{ fontSize: '8px' }}>🔒</span>}
+                </button>
+              </Tip>
+            ))}
+          </div>
+        </div>
+      )}
+      <nav style={{ flex: 1, padding: '8px', overflowY: 'auto' }}>
+        {TABS.map((t, i) => (
+          <Tip key={t.id} text={t.label}>
+            <button onClick={() => setTab(t.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', marginBottom: '2px', background: tab === t.id ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'transparent', border: 'none', color: tab === t.id ? '#fff' : 'var(--text-sec)', cursor: 'pointer', textAlign: 'left', fontSize: '12px', fontWeight: 500, transition: '0.2s' }}>
+              <span style={{ fontSize: '15px' }}>{t.icon}</span>
+              {!collapsed && <span>{t.label}</span>}
+            </button>
+          </Tip>
+        ))}
+      </nav>
+      {!collapsed && (
+        <div style={{ padding: '10px', borderTop: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '4px' }}>AI Model</div>
+          <select value={llm} onChange={e => setLlm(e.target.value)} style={{ width: '100%', padding: '8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '11px' }}>
+            {LLMS.map(m => <option key={m.id} value={m.id}>{m.icon} {m.name}</option>)}
+          </select>
+        </div>
+      )}
+    </aside>
+  );
+
+  // Header
+  const Header = () => (
+    <header style={{ height: 'var(--header)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
+      <h1 style={{ fontSize: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {TABS.find(t => t.id === tab)?.icon} {TABS.find(t => t.id === tab)?.label}
+      </h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <Tip text={vscode ? 'VS Code connected' : 'Connect to VS Code'}>
+          <button onClick={() => !vscode && setModal('vscode')} style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '11px', background: vscode ? 'rgba(16,185,129,0.2)' : 'var(--bg-input)', border: '1px solid ' + (vscode ? 'var(--success)' : 'var(--border)'), color: vscode ? 'var(--success)' : 'var(--text-sec)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '14px' }}>💻</span>
+            <span>{vscode ? 'VS Code ✓' : 'VS Code'}</span>
+            {vscode && <span className="status-pulse" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)' }} />}
+          </button>
+        </Tip>
+        <div className="status-pulse" style={{ padding: '4px 10px', borderRadius: '14px', fontSize: '11px', fontWeight: 600, background: ENVS.find(e => e.id === env)?.color, color: '#fff' }}>{env}</div>
+        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-input)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👤</div>
+      </div>
+    </header>
+  );
+
+  // Content Router
+  const Content = () => {
+    switch (tab) {
+      case 'dashboard': return <Dashboard />;
+      case 'code': return <CodeStudio />;
+      case 'format': return <SqlFormatter />;
+      case 'docs': return <Documentation />;
+      case 'tests': return <TestGenerator />;
+      case 'github': return <GitHub />;
+      case 'jobs': return <JobMonitor />;
+      case 'kb': return <KnowledgeBase />;
+      case 'lineage': return <DataLineage />;
+      case 'snippets': return <Snippets />;
+      case 'settings': return <Settings />;
+      default: return <Dashboard />;
+    }
+  };
+
+  // Modal
+  const Modal = () => {
+    if (!modal) return null;
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} className="fade-in">
+        <div className="scale-in" style={{ width: '100%', maxWidth: '400px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ fontSize: '16px' }}>{modal === 'snowflake' ? '🔷 Connect Snowflake' : modal === 'github' ? '🔗 Connect GitHub' : '💻 Connect VS Code'}</h3>
+            <button onClick={() => setModal(null)} style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--bg-input)', border: 'none', color: 'var(--text-sec)', cursor: 'pointer' }}>✕</button>
+          </div>
+          <div style={{ padding: '20px' }}>
+            {modal === 'snowflake' && (
+              <>
+                <div style={{ marginBottom: '14px' }}><label style={{ fontSize: '11px', color: 'var(--text-sec)', display: 'block', marginBottom: '4px' }}>Account</label><input placeholder="org-account.region" style={s.input} /></div>
+                <div style={{ marginBottom: '14px' }}><label style={{ fontSize: '11px', color: 'var(--text-sec)', display: 'block', marginBottom: '4px' }}>Username</label><input style={s.input} /></div>
+                <div style={{ marginBottom: '14px' }}><label style={{ fontSize: '11px', color: 'var(--text-sec)', display: 'block', marginBottom: '4px' }}>Password</label><input type="password" style={s.input} /></div>
+              </>
+            )}
+            {modal === 'github' && (
+              <>
+                <div style={{ marginBottom: '14px' }}><label style={{ fontSize: '11px', color: 'var(--text-sec)', display: 'block', marginBottom: '4px' }}>Repository</label><input placeholder="owner/repo" style={s.input} /></div>
+                <div style={{ marginBottom: '14px' }}><label style={{ fontSize: '11px', color: 'var(--text-sec)', display: 'block', marginBottom: '4px' }}>Token</label><input type="password" placeholder="ghp_xxx" style={s.input} /></div>
+              </>
+            )}
+            {modal === 'vscode' && (
+              <>
+                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                  <span style={{ fontSize: '48px' }} className="float">💻</span>
+                  <p style={{ fontSize: '12px', color: 'var(--text-sec)', marginTop: '10px' }}>Connect via EDW Nexus extension</p>
+                </div>
+                <div style={{ marginBottom: '14px' }}><label style={{ fontSize: '11px', color: 'var(--text-sec)', display: 'block', marginBottom: '4px' }}>Method</label><select style={s.input}><option>Local Extension</option><option>Remote - SSH</option></select></div>
+                <div style={{ marginBottom: '14px' }}><label style={{ fontSize: '11px', color: 'var(--text-sec)', display: 'block', marginBottom: '4px' }}>Port</label><input defaultValue="8765" style={s.input} /></div>
+                <div style={{ padding: '10px', background: 'var(--bg)', borderRadius: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>💡 Install the EDW Nexus extension in VS Code</div>
+              </>
+            )}
+          </div>
+          <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <button onClick={() => setModal(null)} style={s.btn2}>Cancel</button>
+            <button onClick={() => { setLoading(true); setTimeout(() => { if (modal === 'snowflake') setAuth({ ...auth, PROD: true }); else if (modal === 'github') setAuth({ ...auth, github: true }); else connectVS(); setModal(null); setLoading(false); if (modal !== 'vscode') { setConfetti(true); toast('Connected! 🎉'); } }, 800); }} disabled={loading} className="btn-glow" style={{ ...s.btn, opacity: loading ? 0.5 : 1 }}>{loading ? '⏳' : '🔐'} Connect</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Toasts
+  const Toasts = () => (
+    <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 1100, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {toasts.map(t => (
+        <div key={t.id} className="slide-in" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', borderLeft: '4px solid ' + (t.type === 'success' ? 'var(--success)' : t.type === 'error' ? 'var(--error)' : 'var(--accent)'), boxShadow: '0 4px 20px rgba(0,0,0,.3)' }}>
+          <span>{t.type === 'success' ? '✅' : t.type === 'error' ? '❌' : 'ℹ️'}</span>
+          <span style={{ fontSize: '13px' }}>{t.msg}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Global Progress
+  const GlobalProgress = () => {
+    if (!progress) return null;
+    return (
+      <div style={{ position: 'fixed', top: 'var(--header)', left: collapsed ? '60px' : 'var(--sidebar)', right: 0, zIndex: 99, padding: '8px 16px', background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }} className="fade-in">
+        <Progress value={progress.val} label={progress.label} />
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', position: 'relative' }}>
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 60%)' }} />
+      <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+        <Sidebar />
+        <main style={{ flex: 1, marginLeft: collapsed ? '60px' : 'var(--sidebar)', display: 'flex', flexDirection: 'column', transition: 'margin-left 0.3s' }}>
+          <Header />
+          <GlobalProgress />
+          <div style={{ flex: 1, padding: '16px', overflowY: 'auto', paddingTop: progress ? '60px' : '16px' }}>
+            <Content />
+          </div>
+        </main>
+      </div>
+      <Modal />
+      <Toasts />
+      <Confetti show={confetti} onDone={() => setConfetti(false)} />
+    </div>
+  );
+};
+
+// React 18 createRoot API
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
